@@ -36,14 +36,12 @@ def check_instagram(username):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     }
     try:
-        # Double check to prevent false alarms
         response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200:
             return "ACTIVE"
-        elif response.status_code == 404 or response.status_code == 302:
+        elif response.status_code in [404, 302]:
             return "CLOSED"
         else:
-            # If Instagram blocks temporarily, re-verify instead of throwing a false alarm
             time.sleep(2)
             retry_res = requests.get(url, headers=headers, timeout=5)
             if retry_res.status_code == 200:
@@ -71,7 +69,7 @@ def process_telegram_commands():
                 if chat_id != CHAT_ID:
                     continue
                     
-                # /unban
+                # /unban command
                 if text.startswith("/unban"):
                     parts = text.split()
                     if len(parts) > 1:
@@ -83,7 +81,7 @@ def process_telegram_commands():
                     else:
                         send_telegram("⚠️ Please specify a username. Example: /unban @username")
                         
-                # /ban
+                # /ban command
                 elif text.startswith("/ban"):
                     parts = text.split()
                     if len(parts) > 1:
@@ -95,7 +93,7 @@ def process_telegram_commands():
                     else:
                         send_telegram("⚠️ Please specify a username. Example: /ban @username")
                         
-                # /remove
+                # /remove command
                 elif text.startswith("/remove"):
                     parts = text.split()
                     if len(parts) > 1:
@@ -115,7 +113,7 @@ def process_telegram_commands():
                     else:
                         send_telegram("⚠️ Please specify a username. Example: /remove @username")
 
-                # /list
+                # /list command
                 elif text.startswith("/list"):
                     msg_text = "📋 <b>Tracked Accounts:</b>\n\n"
                     msg_text += f"🟢 <b>Waiting for Unban:</b> {list(unban_list) if unban_list else 'Empty'}\n"
@@ -129,27 +127,32 @@ def main():
     t.daemon = True
     t.start()
     
-    send_telegram("🚀 <b>Bot Updated & Running in English!</b>")
+    send_telegram("🚀 <b>Bot Updated & Fully Operational!</b>")
     
     while True:
         try:
             process_telegram_commands()
             
-            # Check Unban list (Triggered when account becomes ACTIVE)
-            for username in list(unban_list):
+            # Create a safe copy of lists to iterate over
+            current_unban = list(unban_list)
+            for username in current_unban:
+                if username not in unban_list:
+                    continue
                 process_telegram_commands()
                 status = check_instagram(username)
                 if status == "ACTIVE":
                     send_telegram(f"✅ <b>Account Activated!</b> @{username}\nhttps://www.instagram.com/{username}")
-                    unban_list.remove(username)
+                    unban_list.discard(username)
                     
-            # Check Ban list (Triggered when account becomes CLOSED)
-            for username in list(ban_list):
+            current_ban = list(ban_list)
+            for username in current_ban:
+                if username not in ban_list:
+                    continue
                 process_telegram_commands()
                 status = check_instagram(username)
                 if status == "CLOSED":
                     send_telegram(f"❌ <b>Account Banned/Closed!</b> @{username}\nhttps://www.instagram.com/{username}")
-                    ban_list.remove(username)
+                    ban_list.discard(username)
                     
             time.sleep(15)
             
@@ -158,4 +161,3 @@ def main():
             time.sleep(5)
 
 if __name__ == "__main__":
-    main()
