@@ -31,23 +31,35 @@ def send_telegram(message):
         print(f"Telegram error: {e}")
 
 def check_instagram(username):
-    url = f"https://www.instagram.com/{username}/"
+    # Professional API check to completely eliminate false "closed" alarms on active accounts
+    api_url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "X-IG-App-ID": "936619743392459",
+        "Accept": "application/json",
+        "Referer": f"https://www.instagram.com/{username}/"
     }
     try:
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(api_url, headers=headers, timeout=5)
         if response.status_code == 200:
-            return "ACTIVE"
-        elif response.status_code in [404, 302]:
-            return "CLOSED"
-        else:
-            time.sleep(2)
-            retry_res = requests.get(url, headers=headers, timeout=5)
-            if retry_res.status_code == 200:
+            data = response.json()
+            user_data = data.get("data", {}).get("user")
+            if user_data is not None:
                 return "ACTIVE"
             else:
                 return "CLOSED"
+        elif response.status_code == 404:
+            return "CLOSED"
+        else:
+            # Fallback check to prevent false alarms during temporary rate limits
+            fallback_url = f"https://www.instagram.com/{username}/"
+            fb_res = requests.get(fallback_url, headers={"User-Agent": headers["User-Agent"]}, timeout=5)
+            if fb_res.status_code == 200:
+                return "ACTIVE"
+            elif fb_res.status_code == 404:
+                return "CLOSED"
+            else:
+                return "ACTIVE"
     except Exception as e:
         print(f"Instagram check error (@{username}): {e}")
         return "ERROR"
@@ -133,7 +145,6 @@ def main():
         try:
             process_telegram_commands()
             
-            # Create a safe copy of lists to iterate over
             current_unban = list(unban_list)
             for username in current_unban:
                 if username not in unban_list:
@@ -161,3 +172,4 @@ def main():
             time.sleep(5)
 
 if __name__ == "__main__":
+    main()
