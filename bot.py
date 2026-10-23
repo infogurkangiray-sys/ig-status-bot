@@ -48,6 +48,7 @@ def process_telegram_commands():
                 if chat_id != CHAT_ID:
                     continue
                     
+                # 1. UNBAN KOMUTU (Kapalı hesabı izle)
                 if text.startswith("/unban"):
                     parts = text.split()
                     if len(parts) > 1:
@@ -55,21 +56,43 @@ def process_telegram_commands():
                         unban_list.add(username)
                         if username in ban_list:
                             ban_list.remove(username)
-                        send_telegram(f"👀 <b>Tracking for Unban:</b> @{username}")
+                        send_telegram(f"👀 <b>Tracking for Unban (Waiting to Open):</b> @{username}")
                     else:
                         send_telegram("⚠️ Please specify a username. Example: /unban @username")
                         
+                # 2. BAN KOMUTU (Açık hesabı izle)
                 elif text.startswith("/ban"):
                     parts = text.split()
                     if len(parts) > 1:
                         username = parts[1].replace("@", "").strip()
-                        ban_list.add(username) # DÜZELTME BURADA YAPILDI
+                        ban_list.add(username)
                         if username in unban_list:
                             unban_list.remove(username)
-                        send_telegram(f"👀 <b>Tracking for Ban:</b> @{username}")
+                        send_telegram(f"👀 <b>Tracking for Ban (Waiting to Close):</b> @{username}")
                     else:
                         send_telegram("⚠️ Please specify a username. Example: /ban @username")
                         
+                # 3. LİSTEDEN SİLME KOMUTU
+                elif text.startswith("/remove"):
+                    parts = text.split()
+                    if len(parts) > 1:
+                        username = parts[1].replace("@", "").strip()
+                        removed = False
+                        if username in unban_list:
+                            unban_list.remove(username)
+                            removed = True
+                        if username in ban_list:
+                            ban_list.remove(username)
+                            removed = True
+                            
+                        if removed:
+                            send_telegram(f"🗑️ <b>Removed from tracking:</b> @{username}")
+                        else:
+                            send_telegram(f"⚠️ @{username} was not found in any tracking list.")
+                    else:
+                        send_telegram("⚠️ Please specify a username. Example: /remove @username")
+
+                # 4. LİSTeleme KOMUTU
                 elif text.startswith("/list"):
                     msg_text = "📋 <b>Tracked Accounts:</b>\n\n"
                     msg_text += f"🟢 <b>Waiting for Unban:</b> {list(unban_list)}\n"
@@ -79,7 +102,7 @@ def process_telegram_commands():
         print(f"Command error: {e}")
 
 def main():
-    send_telegram("🚀 <b>IG Status Monitor Bot is Active & Interactive!</b>\n\nCommands:\n/unban @username\n/ban @username\n/list")
+    send_telegram("🚀 <b>IG Status Monitor Bot is Active & Interactive!</b>\n\nCommands:\n/unban @username\n/ban @username\n/remove @username\n/list")
     
     while True:
         try:
