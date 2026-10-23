@@ -63,7 +63,7 @@ def process_telegram_commands():
                     parts = text.split()
                     if len(parts) > 1:
                         username = parts[1].replace("@", "").strip()
-                        ban_list.add(username)
+                        ban_list.add(username) # DÜZELTME BURADA YAPILDI
                         if username in unban_list:
                             unban_list.remove(username)
                         send_telegram(f"👀 <b>Tracking for Ban:</b> @{username}")
