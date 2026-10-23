@@ -1,5 +1,18 @@
 import time
 import requests
+import threading
+from flask import Flask
+
+# --- 1. MİNİ WEB SUNUCUSU (Render'ın port hatasını çözmek için) ---
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "IG Status Monitor Bot is Running!"
+
+def run_web():
+    app.run(host="0.0.0.0", port=10000)
+# -------------------------------------------------------------
 
 # Telegram Bilgilerin
 TELEGRAM_TOKEN = "8615223587:AAF3-6mxihxBwZZ_cUU8BRwdt5dBOfB-E3M"
@@ -102,6 +115,11 @@ def process_telegram_commands():
         print(f"Command error: {e}")
 
 def main():
+    # Mini web sunucusunu arka planda (ayrı bir kolda) başlat
+    t = threading.Thread(target=run_web)
+    t.daemon = True
+    t.start()
+    
     send_telegram("🚀 <b>IG Status Monitor Bot is Active & Interactive!</b>\n\nCommands:\n/unban @username\n/ban @username\n/remove @username\n/list")
     
     while True:
