@@ -3,7 +3,7 @@ import requests
 import threading
 from flask import Flask
 
-# --- 1. MİNİ WEB SUNUCUSU (Render'ın port hatasını çözmek için) ---
+# --- 1. MİNİ WEB SUNUCUSU (Render Port Desteği) ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -12,15 +12,13 @@ def home():
 
 def run_web():
     app.run(host="0.0.0.0", port=10000)
-# -------------------------------------------------------------
+# --------------------------------------------------
 
-# Telegram Bilgilerin
 TELEGRAM_TOKEN = "8615223587:AAF3-6mxihxBwZZ_cUU8BRwdt5dBOfB-E3M"
 CHAT_ID = "1982331582"
 
-# Dinamik Takip Listeleri
-unban_list = set() # Açılması beklenenler (Kapalı hesaplar)
-ban_list = set()   # Kapanması beklenenler (Açık hesaplar)
+unban_list = set()
+ban_list = set()
 
 last_update_id = 0
 
@@ -28,27 +26,29 @@ def send_telegram(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML"}
     try:
-        requests.post(url, data=payload)
+        requests.post(url, data=payload, timeout=5)
     except Exception as e:
         print(f"Telegram error: {e}")
 
 def check_instagram(username):
     url = f"https://www.instagram.com/{username}/"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     }
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        # Strict timeout (3 saniye) eklenerek botun kilitlenmesi önlendi
+        response = requests.get(url, headers=headers, timeout=3)
         return response.status_code == 200
-    except:
+    except Exception as e:
+        print(f"Instagram check error (@{username}): {e}")
         return False
 
 def process_telegram_commands():
     global last_update_id
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates"
-    params = {"offset": last_update_id + 1, "timeout": 2}
+    params = {"offset": last_update_id + 1, "timeout": 1}
     try:
-        res = requests.get(url, params=params, timeout=5)
+        res = requests.get(url, params=params, timeout=3)
         data = res.json()
         if data.get("ok"):
             for update in data.get("result", []):
@@ -57,11 +57,10 @@ def process_telegram_commands():
                 text = msg.get("text", "").strip()
                 chat_id = str(msg.get("chat", {}).get("id", ""))
                 
-                # Sadece senin sohbetinden gelen komutları dinle
                 if chat_id != CHAT_ID:
                     continue
                     
-                # 1. UNBAN KOMUTU (Kapalı hesabı izle)
+                # /unban
                 if text.startswith("/unban"):
                     parts = text.split()
                     if len(parts) > 1:
@@ -69,11 +68,11 @@ def process_telegram_commands():
                         unban_list.add(username)
                         if username in ban_list:
                             ban_list.remove(username)
-                        send_telegram(f"👀 <b>Tracking for Unban (Waiting to Open):</b> @{username}")
+                        send_telegram(f"👀 <b>Unban Takibine Eklendi:</b> @{username}")
                     else:
-                        send_telegram("⚠️ Please specify a username. Example: /unban @username")
+                        send_telegram("⚠️ Kullanıcı adı girin. Örnek: /unban @kullaniciadi")
                         
-                # 2. BAN KOMUTU (Açık hesabı izle)
+                # /ban
                 elif text.startswith("/ban"):
                     parts = text.split()
                     if len(parts) > 1:
@@ -81,11 +80,11 @@ def process_telegram_commands():
                         ban_list.add(username)
                         if username in unban_list:
                             unban_list.remove(username)
-                        send_telegram(f"👀 <b>Tracking for Ban (Waiting to Close):</b> @{username}")
+                        send_telegram(f"👀 <b>Ban Takibine Eklendi:</b> @{username}")
                     else:
-                        send_telegram("⚠️ Please specify a username. Example: /ban @username")
+                        send_telegram("⚠️ Kullanıcı adı girin. Örnek: /ban @kullaniciadi")
                         
-                # 3. LİSTEDEN SİLME KOMUTU
+                # /remove
                 elif text.startswith("/remove"):
                     parts = text.split()
                     if len(parts) > 1:
@@ -99,61 +98,54 @@ def process_telegram_commands():
                             removed = True
                             
                         if removed:
-                            send_telegram(f"🗑️ <b>Removed from tracking:</b> @{username}")
+                            send_telegram(f"🗑️ <b>Takip Listesinden Silindi:</b> @{username}")
                         else:
-                            send_telegram(f"⚠️ @{username} was not found in any tracking list.")
+                            send_telegram(f"⚠️ @{username} listede bulunamadı.")
                     else:
-                        send_telegram("⚠️ Please specify a username. Example: /remove @username")
+                        send_telegram("⚠️ Kullanıcı adı girin. Örnek: /remove @kullaniciadi")
 
-                # 4. LİSTeleme KOMUTU
+                # /list
                 elif text.startswith("/list"):
-                    msg_text = "📋 <b>Tracked Accounts:</b>\n\n"
-                    msg_text += f"🟢 <b>Waiting for Unban:</b> {list(unban_list)}\n"
-                    msg_text += f"🔴 <b>Waiting for Ban:</b> {list(ban_list)}"
+                    msg_text = "📋 <b>Takip Edilen Hesaplar:</b>\n\n"
+                    msg_text += f"🟢 <b>Unban Bekleyenler (Kapalılar):</b> {list(unban_list)}\n"
+                    msg_text += f"🔴 <b>Ban Bekleyenler (Açıklar):</b> {list(ban_list)}"
                     send_telegram(msg_text)
     except Exception as e:
-        print(f"Command error: {e}")
+        print(f"Command processing error: {e}")
 
 def main():
-    # Mini web sunucusunu arka planda (ayrı bir kolda) başlat
     t = threading.Thread(target=run_web)
     t.daemon = True
     t.start()
     
-    send_telegram("🚀 <b>IG Status Monitor Bot is Active & Interactive!</b>\n\nCommands:\n/unban @username\n/ban @username\n/remove @username\n/list")
+    send_telegram("🚀 <b>Bot Yeniden Başlatıldı & Komut Kontrolü Aktif!</b>")
     
     while True:
         try:
-            # 1. Telegram'dan gelen komutları kontrol et
+            # Önce Telegram komutlarını oku
             process_telegram_commands()
             
-            # 2. Kapalı hesaplar açıldı mı kontrol et (Unban listesi)
+            # Unban kontrolü
             for username in list(unban_list):
+                process_telegram_commands() # Komut gecikmesini önlemek için döngü içinde de kontrol et
                 is_active = check_instagram(username)
                 if is_active:
-                    msg = (
-                        f"✅ <b>Account Activated</b> 👤 <b>Username:</b> @{username}\n"
-                        f"🔗 <b>Link:</b> https://www.instagram.com/{username}"
-                    )
-                    send_telegram(msg)
+                    send_telegram(f"✅ <b>Hesap Açıldı!</b> @{username}\nhttps://www.instagram.com/{username}")
                     unban_list.remove(username)
                     
-            # 3. Açık hesaplar kapandı mı kontrol et (Ban listesi)
+            # Ban kontrolü
             for username in list(ban_list):
+                process_telegram_commands()
                 is_active = check_instagram(username)
                 if not is_active:
-                    msg = (
-                        f"❌ <b>Account Banned</b> 👤 <b>Username:</b> @{username}\n"
-                        f"🔗 <b>Link:</b> https://www.instagram.com/{username}"
-                    )
-                    send_telegram(msg)
+                    send_telegram(f"❌ <b>Hesap Kaptıldı/Banned!</b> @{username}\nhttps://www.instagram.com/{username}")
                     ban_list.remove(username)
                     
-            time.sleep(30)
+            time.sleep(10) # 10 saniye bekle
             
         except Exception as e:
             print(f"Main loop error: {e}")
-            time.sleep(10)
+            time.sleep(5)
 
 if __name__ == "__main__":
     main()
