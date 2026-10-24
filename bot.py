@@ -47,26 +47,19 @@ def send_telegram_photo(photo_bytes, caption):
         send_telegram_message(caption)
 
 def generate_profile_card(username, profile_pic_url, posts_count, followers_count, following_count):
-    # Siyah arka planlı modern Instagram kartı oluşturuyoruz (Genişlik: 800, Yükseklik: 500)
     width, height = 800, 500
     card = Image.new("RGB", (width, height), color=(15, 15, 15))
     draw = ImageDraw.Draw(card)
     
-    # Profil Fotoğrafı (İndirip karta yuvarlak şekilde yerleştiriyoruz)
     try:
         response = requests.get(profile_pic_url, timeout=5)
         if response.status_code == 200:
             avatar = Image.open(BytesIO(response.content)).convert("RGBA")
             avatar = avatar.resize((120, 120))
-            
-            # Yuvarlak maske oluştur
-            mask = Image.new("L", (120, 0), 0)
-            # Basit kare veya daire yerleşimi için doğrudan yapıştırıyoruz
             card.paste(avatar, (60, 60), avatar)
     except Exception as e:
         print(f"Avatar load error: {e}")
         
-    # Yazı ve İstatistikler için varsayılan font (sistem fontu)
     try:
         font_large = ImageFont.truetype("arial.ttf", 28)
         font_med = ImageFont.truetype("arial.ttf", 22)
@@ -76,11 +69,8 @@ def generate_profile_card(username, profile_pic_url, posts_count, followers_coun
         font_med = ImageFont.load_default()
         font_small = ImageFont.load_default()
 
-    # Kullanıcı Adı
     draw.text((210, 75), f"@{username}", fill=(255, 255, 255), font=font_large)
     
-    # İstatistikler (Posts, Followers, Following)
-    # Konumlar: Posts (210), Followers (340), Following (490)
     draw.text((210, 130), str(posts_count), fill=(255, 255, 255), font=font_med)
     draw.text((210, 160), "posts", fill=(150, 150, 150), font=font_small)
     
@@ -91,7 +81,6 @@ def generate_profile_card(username, profile_pic_url, posts_count, followers_coun
     draw.text((490, 130), str(following_count), fill=(255, 255, 255), font=font_med)
     draw.text((490, 160), "following", fill=(150, 150, 150), font=font_small)
 
-    # Görseli byte dizisine çevir
     img_byte_arr = BytesIO()
     card.save(img_byte_arr, format='JPEG', quality=95)
     img_byte_arr.seek(0)
@@ -99,28 +88,36 @@ def generate_profile_card(username, profile_pic_url, posts_count, followers_coun
 
 def check_instagram(username):
     api_url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}"
+    # Güvenlik duvarını aşmak için güncellenmiş mobil/tarayıcı başlıkları
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.55 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
         "X-IG-App-ID": "936619743392459",
-        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
         "Referer": f"https://www.instagram.com/{username}/"
     }
     try:
         response = requests.get(api_url, headers=headers, timeout=5)
         if response.status_code == 200:
-            data = response.json()
-            user_data = data.get("data", {}).get("user")
-            if user_data is not None:
-                pic_url = user_data.get("profile_pic_url_hd") or user_data.get("profile_pic_url")
-                followers = user_data.get("edge_followed_by", {}).get("count", 0)
-                following = user_data.get("edge_follow", {}).get("count", 0)
-                posts = user_data.get("edge_owner_to_timeline_media", {}).get("count", 0)
-                return "ACTIVE", pic_url, followers, following, posts
-            else:
-                return "CLOSED", None, 0, 0, 0
+            try:
+                data = response.json()
+                user_data = data.get("data", {}).get("user")
+                if user_data is not None:
+                    pic_url = user_data.get("profile_pic_url_hd") or user_data.get("profile_pic_url")
+                    followers = user_data.get("edge_followed_by", {}).get("count", 0)
+                    following = user_data.get("edge_follow", {}).get("count", 0)
+                    posts = user_data.get("edge_owner_to_timeline_media", {}).get("count", 0)
+                    return "ACTIVE", pic_url, followers, following, posts
+                else:
+                    return "CLOSED", None, 0, 0, 0
+            except Exception as json_err:
+                print(f"JSON parse error for @{username}: {json_err}")
+                return "ACTIVE", None, 0, 0, 0
         elif response.status_code == 404:
             return "CLOSED", None, 0, 0, 0
         else:
+            print(f"Instagram block/error status code: {response.status_code} for @{username}")
             return "ACTIVE", None, 0, 0, 0
     except Exception as e:
         print(f"Instagram check error (@{username}): {e}")
@@ -199,7 +196,7 @@ def main():
     t.daemon = True
     t.start()
     
-    send_telegram_message("🚀 <b>Bot Updated with Custom Profile Cards!</b>")
+    send_telegram_message("🚀 <b>Bot Updated with Advanced Headers!</b>")
     
     while True:
         try:
