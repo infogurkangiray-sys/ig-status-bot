@@ -14,7 +14,7 @@ def run_web():
     app.run(host="0.0.0.0", port=10000)
 # --------------------------------------------------
 
-TELEGRAM_TOKEN = "8615223587:AAF3-6mxihxBwZZ_cUU8BRwdt5dBOfB-E3M"
+TELEGRAM_TOKEN = "8615223587:AAGAFs6Wo6IFcCWnkvg2Nn-PO7w6OHsGemA"
 CHAT_ID = "1982331582"
 
 unban_list = set()
